@@ -1,0 +1,577 @@
+package com.atsumeru.api
+
+import com.atsumeru.api.listeners.UploadProgressListener
+import com.atsumeru.api.manager.ServerManager
+import com.atsumeru.api.model.*
+import com.atsumeru.api.model.category.Category
+import com.atsumeru.api.model.filesystem.DirectoryListing
+import com.atsumeru.api.model.filesystem.DirectoryRequest
+import com.atsumeru.api.model.importer.FolderProperty
+import com.atsumeru.api.model.importer.ImportStatus
+import com.atsumeru.api.model.info.ServerInfo
+import com.atsumeru.api.model.info.UserAccessConstants
+import com.atsumeru.api.model.metacategory.Metacategory
+import com.atsumeru.api.model.metadata.MetadataUpdateStatus
+import com.atsumeru.api.model.services.ServicesStatus
+import com.atsumeru.api.model.settings.ServerSettings
+import com.atsumeru.api.model.sync.History
+import com.atsumeru.api.model.user.User
+import com.atsumeru.api.network.AtsumeruService
+import com.atsumeru.api.utils.*
+import com.google.gson.Gson
+import com.google.gson.GsonBuilder
+import io.reactivex.Single
+import io.reactivex.SingleEmitter
+import okhttp3.*
+import okhttp3.logging.HttpLoggingInterceptor
+import retrofit2.Retrofit
+import retrofit2.adapter.rxjava2.RxJava2CallAdapterFactory
+import retrofit2.converter.gson.GsonConverterFactory
+import java.io.File
+import java.util.concurrent.TimeUnit
+
+@Suppress("unused")
+object AtsumeruAPI {
+    private lateinit var atsumeruService: AtsumeruService
+    private lateinit var serverManager: ServerManager
+    private lateinit var restAdapter: Retrofit
+    private lateinit var httpClient: OkHttpClient
+    private lateinit var gson: Gson
+    private var isDebug: Boolean = false
+
+    @JvmStatic
+    fun init(builder: OkHttpClient.Builder, isDebug: Boolean) {
+        com.atsumeru.api.AtsumeruAPI.isDebug = isDebug
+        com.atsumeru.api.AtsumeruAPI.serverManager = ServerManager()
+
+        com.atsumeru.api.AtsumeruAPI.gson = GsonBuilder().create()
+
+        val loggingInterceptor = HttpLoggingInterceptor()
+        loggingInterceptor.level = if (isDebug) HttpLoggingInterceptor.Level.BODY else HttpLoggingInterceptor.Level.NONE
+
+        com.atsumeru.api.AtsumeruAPI.httpClient = builder.connectTimeout(HTTP_CONNECT_TIMEOUT.toLong(), TimeUnit.MILLISECONDS)
+            .readTimeout(HTTP_READ_TIMEOUT.toLong(), TimeUnit.MILLISECONDS)
+            .addInterceptor(loggingInterceptor)
+            .addInterceptor { chain ->
+                var request = chain.request()
+                val requestBuilder = request.newBuilder()
+                    .removeHeader("User-Agent")
+                    .addHeader("User-Agent", USER_AGENT)
+
+                request = requestBuilder.build()
+                chain.proceed(request)
+            }
+            .authenticator(Authenticator { _: Route, response: Response ->
+                val credentials = com.atsumeru.api.AtsumeruAPI.serverManager.createBasicAuth() ?: return@Authenticator null
+                return@Authenticator response.request().newBuilder().header("Authorization", credentials).build()
+            })
+            .build()
+
+        com.atsumeru.api.AtsumeruAPI.restAdapter = Retrofit.Builder()
+            .baseUrl(getEndpointUrl())
+            .client(com.atsumeru.api.AtsumeruAPI.httpClient)
+            .addConverterFactory(GsonConverterFactory.create(com.atsumeru.api.AtsumeruAPI.gson))
+            .addCallAdapterFactory(RxJava2CallAdapterFactory.create())
+            .build()
+
+        com.atsumeru.api.AtsumeruAPI.atsumeruService = com.atsumeru.api.AtsumeruAPI.restAdapter.create(AtsumeruService::class.java)
+    }
+
+    @JvmStatic
+    fun changeServer(id: Int) {
+        val baseUrl = com.atsumeru.api.AtsumeruAPI.serverManager.changeServer(id)
+        if (baseUrl != null) {
+            setMainUrl(baseUrl)
+            com.atsumeru.api.AtsumeruAPI.atsumeruService = com.atsumeru.api.AtsumeruAPI.restAdapter.newBuilder().baseUrl(baseUrl).build()
+                .create(AtsumeruService::class.java)
+        }
+    }
+
+    @JvmStatic
+    fun getServerManager(): ServerManager {
+        return com.atsumeru.api.AtsumeruAPI.serverManager
+    }
+
+    //*****************************//
+    //*          Server           *//
+    //*****************************//
+    @JvmStatic
+    fun getServerInfo(): Single<ServerInfo> {
+        return com.atsumeru.api.AtsumeruAPI.atsumeruService.getServerInfo()
+    }
+
+    @JvmStatic
+    fun clearServerCache(): Single<AtsumeruMessage> {
+        return com.atsumeru.api.AtsumeruAPI.atsumeruService.clearServerCache()
+    }
+
+    //*****************************//
+    //*         Book List         *//
+    //*****************************//
+    @JvmStatic
+    fun getBooksList(
+        libraryPresentation: LibraryPresentation = LibraryPresentation.SERIES,
+        search: String? = null,
+        contentType: String? = null,
+        category: String? = null,
+        sort: Sort = Sort.CREATED_AT,
+        ascending: Boolean = false,
+        page: Int = 1,
+        limit: Int = 30,
+        withVolumesAndHistory: Boolean = false,
+        getAll: Boolean = false
+    ): Single<List<Serie>> {
+        return com.atsumeru.api.AtsumeruAPI.atsumeruService.getBooksList(
+            libraryPresentation,
+            search,
+            contentType,
+            category,
+            sort,
+            ascending,
+            page,
+            limit,
+            withVolumesAndHistory,
+            getAll
+        )
+    }
+
+    //*****************************//
+    //*   Books By Bound Service  *//
+    //*****************************//
+    @JvmStatic
+    fun getBooksByBoundService(boundServiceName: String, boundServiceId: String): Single<List<Serie>> {
+        return com.atsumeru.api.AtsumeruAPI.atsumeruService.getBooksByBoundService(boundServiceName, boundServiceId)
+    }
+
+    @JvmStatic
+    fun checkLinksDownloaded(links: List<String>): Single<DownloadedLinks> {
+        return com.atsumeru.api.AtsumeruAPI.atsumeruService.checkLinksDownloaded(HashMap<String, String>().apply {
+            put(
+                "links",
+                links.joinToString(",")
+            )
+        })
+    }
+
+    //*****************************//
+    //*         Filters           *//
+    //*****************************//
+    @JvmStatic
+    fun getFiltersList(
+        contentType: String?,
+        category: String?,
+        libraryPresentation: LibraryPresentation
+    ): Single<List<Filters>> {
+        return com.atsumeru.api.AtsumeruAPI.atsumeruService.getFiltersList(contentType, category, libraryPresentation)
+    }
+
+    @JvmStatic
+    fun getFilteredList(
+        contentType: String?,
+        category: String?,
+        libraryPresentation: LibraryPresentation,
+        search: String?,
+        sort: Sort?,
+        ascending: Boolean?,
+        filters: Map<String, String>,
+        page: Int,
+        limit: Int,
+        withVolumesAndHistory: Boolean
+    ): Single<List<Serie>> {
+        return com.atsumeru.api.AtsumeruAPI.atsumeruService.getFilteredList(
+            contentType,
+            category,
+            libraryPresentation,
+            search,
+            sort,
+            ascending,
+            filters,
+            page,
+            limit,
+            withVolumesAndHistory
+        )
+    }
+
+    @JvmStatic
+    fun getFilteredList(
+        contentType: String?, libraryPresentation: LibraryPresentation, search: String?, sort: Sort?,
+        ascending: Boolean?, status: String?, translationStatus: String?,
+        censorship: String?, color: String?, ageRating: String?,
+        authors: List<String>?, authorsMode: String?, artists: List<String>?, artistsMode: String?,
+        publishers: List<String>?, publishersMode: String?, translators: List<String>?, translatorsMode: String?,
+        genres: List<String>?, genresMode: String?, tags: List<String>?, tagsMode: String?,
+        countries: List<String>?, countriesMode: String?, languages: List<String>?, languagesMode: String?,
+        events: List<String>?, eventsMode: String?, characters: List<String>?, charactersMode: String?,
+        parodies: List<String>?, parodiesMode: String?, circles: List<String>?, circlesMode: String?,
+        magazines: List<String>?, magazinesMode: String?, years: String?,
+        page: Int, limit: Int, withVolumesAndHistory: Boolean
+    ): Single<List<Serie>> {
+        return com.atsumeru.api.AtsumeruAPI.atsumeruService.getFilteredList(
+            contentType,
+            libraryPresentation,
+            search,
+            sort,
+            ascending,
+            status,
+            translationStatus,
+            censorship,
+            color,
+            ageRating,
+            authors,
+            authorsMode,
+            artists,
+            artistsMode,
+            publishers,
+            publishersMode,
+            translators,
+            translatorsMode,
+            genres,
+            genresMode,
+            tags,
+            tagsMode,
+            countries,
+            countriesMode,
+            languages,
+            languagesMode,
+            events,
+            eventsMode,
+            characters,
+            charactersMode,
+            parodies,
+            parodiesMode,
+            circles,
+            circlesMode,
+            magazines,
+            magazinesMode,
+            years,
+            page,
+            limit,
+            withVolumesAndHistory
+        )
+    }
+
+    //*****************************//
+    //*      Metacategories       *//
+    //*****************************//
+    @JvmStatic
+    fun getMetacategoriesList(): Single<List<Metacategory>> {
+        return com.atsumeru.api.AtsumeruAPI.atsumeruService.getMetacategoriesList()
+    }
+
+    @JvmStatic
+    fun getMetacategoryEntries(metacategoryId: String): Single<List<Metacategory>> {
+        return com.atsumeru.api.AtsumeruAPI.atsumeruService.getMetacategoryEntries(metacategoryId)
+    }
+
+    @JvmStatic
+    fun getMetacategoryEntryBooks(
+        metacategoryId: String,
+        metacategoryEntryId: String,
+        page: Int,
+        limit: Int,
+        withVolumesAndHistory: Boolean
+    ): Single<List<Serie>> {
+        return com.atsumeru.api.AtsumeruAPI.atsumeruService.getMetacategoryEntryBooks(
+            metacategoryId,
+            metacategoryEntryId,
+            page,
+            limit,
+            withVolumesAndHistory
+        )
+    }
+
+    //*****************************//
+    //*        Categories         *//
+    //*****************************//
+    @JvmStatic
+    fun getCategoriesList(): Single<List<Category>> {
+        return com.atsumeru.api.AtsumeruAPI.atsumeruService.getCategoriesList()
+    }
+
+    @JvmStatic
+    fun setCategories(contentIdsWithCategories: Map<String, String>): Single<AtsumeruMessage> {
+        return com.atsumeru.api.AtsumeruAPI.atsumeruService.setCategories(contentIdsWithCategories)
+    }
+
+    @JvmStatic
+    fun orderCategories(changedCategories: List<Category>): Single<AtsumeruMessage> {
+        return com.atsumeru.api.AtsumeruAPI.atsumeruService.orderCategories(changedCategories)
+    }
+
+    @JvmStatic
+    fun createCategory(categoryName: String): Single<AtsumeruMessage> {
+        return com.atsumeru.api.AtsumeruAPI.atsumeruService.createCategory(categoryName)
+    }
+
+    @JvmStatic
+    fun editCategory(categoryId: String, categoryName: String): Single<AtsumeruMessage> {
+        return com.atsumeru.api.AtsumeruAPI.atsumeruService.editCategory(categoryId, categoryName)
+    }
+
+    @JvmStatic
+    fun deleteCategory(categoryId: String): Single<AtsumeruMessage> {
+        return com.atsumeru.api.AtsumeruAPI.atsumeruService.deleteCategory(categoryId)
+    }
+
+    //*****************************//
+    //*    Hub: New and Latest    *//
+    //*****************************//
+    @JvmStatic
+    fun getBooksNewArrivals(
+        libraryPresentation: LibraryPresentation = LibraryPresentation.SERIES,
+        ascendingOrder: Boolean = false,
+        page: Int = 1,
+        limit: Int = 50
+    ): Single<List<Serie>> {
+        return com.atsumeru.api.AtsumeruAPI.atsumeruService.getBooksNewArrivals(libraryPresentation, ascendingOrder, page, limit)
+    }
+
+    @JvmStatic
+    fun getBooksLatestUpdates(
+        libraryPresentation: LibraryPresentation = LibraryPresentation.SERIES,
+        ascendingOrder: Boolean = false,
+        page: Int = 1,
+        limit: Int = 50
+    ): Single<List<Serie>> {
+        return com.atsumeru.api.AtsumeruAPI.atsumeruService.getBooksLatestUpdates(libraryPresentation, ascendingOrder, page, limit)
+    }
+
+    //*****************************//
+    //*       Hub: History        *//
+    //*****************************//
+    @JvmStatic
+    fun getBooksHistory(
+        libraryPresentation: LibraryPresentation = LibraryPresentation.SERIES,
+        page: Int = 1,
+        limit: Int = 50
+    ): Single<List<Serie>> {
+        return com.atsumeru.api.AtsumeruAPI.atsumeruService.getBooksHistory(libraryPresentation, page, limit)
+    }
+
+    //*****************************//
+    //*          Books            *//
+    //*****************************//
+    @JvmStatic
+    fun getBookDetails(bookHash: String): Single<Serie> {
+        return com.atsumeru.api.AtsumeruAPI.atsumeruService.getBookDetails(bookHash)
+    }
+
+    @JvmStatic
+    fun deleteBook(bookHash: String): Single<AtsumeruMessage> {
+        return com.atsumeru.api.AtsumeruAPI.atsumeruService.deleteBook(bookHash)
+    }
+
+    //*****************************//
+    //*         Volumes           *//
+    //*****************************//
+    @JvmStatic
+    fun getBookVolumes(bookHash: String): Single<List<Volume>> {
+        return com.atsumeru.api.AtsumeruAPI.atsumeruService.getBookVolumes(bookHash)
+    }
+
+    @JvmStatic
+    fun getBookVolume(archiveHash: String): Single<Volume> {
+        return com.atsumeru.api.AtsumeruAPI.atsumeruService.getBookVolume(archiveHash)
+    }
+
+    //*****************************//
+    //*         Chapters          *//
+    //*****************************//
+    @JvmStatic
+    fun getBookChapters(bookHash: String): Single<List<Chapter>> {
+        return com.atsumeru.api.AtsumeruAPI.atsumeruService.getBookChapters(bookHash)
+    }
+
+    @JvmStatic
+    fun getVolumeChapters(archiveHash: String): Single<List<Chapter>> {
+        return com.atsumeru.api.AtsumeruAPI.atsumeruService.getVolumeChapters(archiveHash)
+    }
+
+    @JvmStatic
+    fun getBookChapter(chapterHash: String): Single<Chapter> {
+        return com.atsumeru.api.AtsumeruAPI.atsumeruService.getBookChapter(chapterHash)
+    }
+
+    //*****************************//
+    //*         FileSystem        *//
+    //*****************************//
+    @JvmStatic
+    fun getDirectoryListing(requestPath: String?): Single<DirectoryListing> {
+        return com.atsumeru.api.AtsumeruAPI.atsumeruService.getDirectoryListing(DirectoryRequest(requestPath))
+    }
+
+    //*****************************//
+    //*         Users             *//
+    //*****************************//
+    @JvmStatic
+    fun getUserList(): Single<List<User>> {
+        return com.atsumeru.api.AtsumeruAPI.atsumeruService.getUserList()
+    }
+
+    @JvmStatic
+    fun getUserAccessConstants(): Single<UserAccessConstants> {
+        return com.atsumeru.api.AtsumeruAPI.atsumeruService.getUserAccessConstants()
+    }
+
+    @JvmStatic
+    fun createUser(user: User): Single<AtsumeruMessage> {
+        return com.atsumeru.api.AtsumeruAPI.atsumeruService.createUser(user)
+    }
+
+    @JvmStatic
+    fun updateUser(user: User): Single<AtsumeruMessage> {
+        return com.atsumeru.api.AtsumeruAPI.atsumeruService.updateUser(user)
+    }
+
+    @JvmStatic
+    fun deleteUser(userId: Long): Single<AtsumeruMessage> {
+        return com.atsumeru.api.AtsumeruAPI.atsumeruService.deleteUser(userId)
+    }
+
+    //*****************************//
+    //*         Services          *//
+    //*****************************//
+    @JvmStatic
+    fun getServicesStatus(): Single<ServicesStatus> {
+        return com.atsumeru.api.AtsumeruAPI.atsumeruService.getServicesStatus()
+    }
+
+    //*****************************//
+    //*         Metadata          *//
+    //*****************************//
+    @JvmStatic
+    fun getMetadataUpdateStatus(): Single<MetadataUpdateStatus> {
+        return com.atsumeru.api.AtsumeruAPI.atsumeruService.getMetadataUpdateStatus()
+    }
+
+    @JvmStatic
+    fun updateMetadata(
+        serie: Serie,
+        serieOnly: Boolean = false,
+        saveIntoArchives: Boolean = false,
+        saveIntoDBOnly: Boolean = false
+    ): Single<AtsumeruMessage> {
+        return com.atsumeru.api.AtsumeruAPI.atsumeruService.updateMetadata(serie, serieOnly, saveIntoArchives, saveIntoDBOnly)
+    }
+
+    @JvmStatic
+    fun createUniqueIds(
+        saveIntoArchives: Boolean = false,
+        saveIntoDBOnly: Boolean = false,
+        force: Boolean = false
+    ): Single<AtsumeruMessage> {
+        return com.atsumeru.api.AtsumeruAPI.atsumeruService.createUniqueIds(saveIntoArchives, saveIntoDBOnly, force)
+    }
+
+    @JvmStatic
+    fun injectAllFromDatabase(): Single<AtsumeruMessage> {
+        return com.atsumeru.api.AtsumeruAPI.atsumeruService.injectAllFromDatabase()
+    }
+
+    //*****************************//
+    //*         Importer          *//
+    //*****************************//
+    @JvmStatic
+    fun getImporterStatus(): Single<ImportStatus> {
+        return com.atsumeru.api.AtsumeruAPI.atsumeruService.getImporterStatus()
+    }
+
+    @JvmStatic
+    fun getImporterFoldersList(): Single<List<FolderProperty>> {
+        return com.atsumeru.api.AtsumeruAPI.atsumeruService.getImporterFoldersList()
+    }
+
+    @JvmStatic
+    fun addImporterFolder(folderProperty: FolderProperty): Single<AtsumeruMessage> {
+        return com.atsumeru.api.AtsumeruAPI.atsumeruService.addImporterFolder(folderProperty)
+    }
+
+    @JvmStatic
+    fun removeImporterFolder(folderHash: String): Single<AtsumeruMessage> {
+        return com.atsumeru.api.AtsumeruAPI.atsumeruService.removeImporterFolder(folderHash)
+    }
+
+    @JvmStatic
+    fun importerScan(): Single<AtsumeruMessage> {
+        return com.atsumeru.api.AtsumeruAPI.atsumeruService.importerScan()
+    }
+
+    @JvmStatic
+    fun importerRescan(updateCovers: Boolean): Single<AtsumeruMessage> {
+        return com.atsumeru.api.AtsumeruAPI.atsumeruService.importerRescan(updateCovers)
+    }
+
+    @JvmStatic
+    fun importerRescan(folderHash: String, fullRescan: Boolean, updateCovers: Boolean): Single<AtsumeruMessage> {
+        return com.atsumeru.api.AtsumeruAPI.atsumeruService.importerRescan(folderHash, fullRescan, updateCovers)
+    }
+
+    //*****************************//
+    //*         Settings          *//
+    ///****************************//
+    @JvmStatic
+    fun getServerSettings(): Single<ServerSettings> {
+        return com.atsumeru.api.AtsumeruAPI.atsumeruService.getServerSettings()
+    }
+
+    @JvmStatic
+    fun updateServerSettings(serverSettings: ServerSettings): Single<AtsumeruMessage> {
+        return com.atsumeru.api.AtsumeruAPI.atsumeruService.updateServerSettings(serverSettings)
+    }
+
+    //*****************************//
+    //*           Sync            *//
+    ///****************************//
+    @JvmStatic
+    fun getUpdateReadHistory(archiveHash: String, chapterHash: String? = null, page: Int = 1): Single<AtsumeruMessage> {
+        return com.atsumeru.api.AtsumeruAPI.atsumeruService.getUpdateReadHistory(archiveHash, chapterHash, page)
+    }
+
+    @JvmStatic
+    fun postUpdateReadHistory(values: Map<String, String>): Single<AtsumeruMessage> {
+        return com.atsumeru.api.AtsumeruAPI.atsumeruService.postUpdateReadHistory(values)
+    }
+
+    @JvmStatic
+    fun pullBookHistory(bookOrArchiveHash: String): Single<List<History>> {
+        return com.atsumeru.api.AtsumeruAPI.atsumeruService.pullBookHistory(bookOrArchiveHash)
+    }
+
+    //*****************************//
+    //*         Upload            *//
+    //*****************************//
+    @JvmStatic
+    fun uploadFile(
+        serieHash: String,
+        filePath: String,
+        progressListener: UploadProgressListener,
+        overrideFiles: Boolean = false,
+        repackFiles: Boolean = false
+    ): Single<AtsumeruMessage>? {
+        val file = File(filePath)
+        val body = MultipartBody.Builder()
+            .addFormDataPart("hash", serieHash)
+            .addFormDataPart(
+                "file",
+                file.name,
+                file.asProgressRequestBody(MediaType.parse("application/zip"), progressListener)
+            )
+            .build()
+
+        val httpBuilder = HttpUrl.parse(getMainUrl() + "/api/v1/uploader/upload")!!
+            .newBuilder()
+            .addQueryParameter("override", overrideFiles.toString())
+            .addQueryParameter("repack", repackFiles.toString())
+
+        val request: Request = Request.Builder()
+            .url(httpBuilder.build())
+            .post(body)
+            .build()
+
+        return Single.create { subscriber: SingleEmitter<AtsumeruMessage> ->
+            val response = com.atsumeru.api.AtsumeruAPI.httpClient.newCall(request).execute()
+            val message = com.atsumeru.api.AtsumeruAPI.gson.fromJson(response.body()?.string(), AtsumeruMessage::class.java)
+            subscriber.onSuccess(message)
+        }
+    }
+}
