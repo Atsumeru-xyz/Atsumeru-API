@@ -51,11 +51,12 @@ AtsumeruAPI.changeServer(<server id>)
 
 Make calls using predefined methods like this:
 
+Synchronous call
 ```kotlin
 val books = AtsumeruAPI.getBooksList().blockingGet()
 ```
-Synchronous call
 
+Async call
 ```kotlin
 AtsumeruAPI.getBooksList().
     .cache()
@@ -66,4 +67,3 @@ AtsumeruAPI.getBooksList().
         throwable -> {}
     )
 ```
-Async call
