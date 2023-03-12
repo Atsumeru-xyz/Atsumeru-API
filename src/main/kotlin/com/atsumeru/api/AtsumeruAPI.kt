@@ -41,15 +41,15 @@ object AtsumeruAPI {
 
     @JvmStatic
     fun init(builder: OkHttpClient.Builder, isDebug: Boolean) {
-        com.atsumeru.api.AtsumeruAPI.isDebug = isDebug
-        com.atsumeru.api.AtsumeruAPI.serverManager = ServerManager()
+        this.isDebug = isDebug
+        serverManager = ServerManager()
 
-        com.atsumeru.api.AtsumeruAPI.gson = GsonBuilder().create()
+        gson = GsonBuilder().create()
 
         val loggingInterceptor = HttpLoggingInterceptor()
         loggingInterceptor.level = if (isDebug) HttpLoggingInterceptor.Level.BODY else HttpLoggingInterceptor.Level.NONE
 
-        com.atsumeru.api.AtsumeruAPI.httpClient = builder.connectTimeout(HTTP_CONNECT_TIMEOUT.toLong(), TimeUnit.MILLISECONDS)
+        httpClient = builder.connectTimeout(HTTP_CONNECT_TIMEOUT.toLong(), TimeUnit.MILLISECONDS)
             .readTimeout(HTTP_READ_TIMEOUT.toLong(), TimeUnit.MILLISECONDS)
             .addInterceptor(loggingInterceptor)
             .addInterceptor { chain ->
@@ -62,34 +62,34 @@ object AtsumeruAPI {
                 chain.proceed(request)
             }
             .authenticator(Authenticator { _: Route, response: Response ->
-                val credentials = com.atsumeru.api.AtsumeruAPI.serverManager.createBasicAuth() ?: return@Authenticator null
+                val credentials = serverManager.createBasicAuth() ?: return@Authenticator null
                 return@Authenticator response.request().newBuilder().header("Authorization", credentials).build()
             })
             .build()
 
-        com.atsumeru.api.AtsumeruAPI.restAdapter = Retrofit.Builder()
+        restAdapter = Retrofit.Builder()
             .baseUrl(getEndpointUrl())
-            .client(com.atsumeru.api.AtsumeruAPI.httpClient)
-            .addConverterFactory(GsonConverterFactory.create(com.atsumeru.api.AtsumeruAPI.gson))
+            .client(httpClient)
+            .addConverterFactory(GsonConverterFactory.create(gson))
             .addCallAdapterFactory(RxJava2CallAdapterFactory.create())
             .build()
 
-        com.atsumeru.api.AtsumeruAPI.atsumeruService = com.atsumeru.api.AtsumeruAPI.restAdapter.create(AtsumeruService::class.java)
+        atsumeruService = restAdapter.create(AtsumeruService::class.java)
     }
 
     @JvmStatic
     fun changeServer(id: Int) {
-        val baseUrl = com.atsumeru.api.AtsumeruAPI.serverManager.changeServer(id)
+        val baseUrl = serverManager.changeServer(id)
         if (baseUrl != null) {
             setMainUrl(baseUrl)
-            com.atsumeru.api.AtsumeruAPI.atsumeruService = com.atsumeru.api.AtsumeruAPI.restAdapter.newBuilder().baseUrl(baseUrl).build()
+            atsumeruService = restAdapter.newBuilder().baseUrl(baseUrl).build()
                 .create(AtsumeruService::class.java)
         }
     }
 
     @JvmStatic
     fun getServerManager(): ServerManager {
-        return com.atsumeru.api.AtsumeruAPI.serverManager
+        return serverManager
     }
 
     //*****************************//
@@ -97,12 +97,12 @@ object AtsumeruAPI {
     //*****************************//
     @JvmStatic
     fun getServerInfo(): Single<ServerInfo> {
-        return com.atsumeru.api.AtsumeruAPI.atsumeruService.getServerInfo()
+        return atsumeruService.getServerInfo()
     }
 
     @JvmStatic
     fun clearServerCache(): Single<AtsumeruMessage> {
-        return com.atsumeru.api.AtsumeruAPI.atsumeruService.clearServerCache()
+        return atsumeruService.clearServerCache()
     }
 
     //*****************************//
@@ -121,7 +121,7 @@ object AtsumeruAPI {
         withVolumesAndHistory: Boolean = false,
         getAll: Boolean = false
     ): Single<List<Serie>> {
-        return com.atsumeru.api.AtsumeruAPI.atsumeruService.getBooksList(
+        return atsumeruService.getBooksList(
             libraryPresentation,
             search,
             contentType,
@@ -140,12 +140,12 @@ object AtsumeruAPI {
     //*****************************//
     @JvmStatic
     fun getBooksByBoundService(boundServiceName: String, boundServiceId: String): Single<List<Serie>> {
-        return com.atsumeru.api.AtsumeruAPI.atsumeruService.getBooksByBoundService(boundServiceName, boundServiceId)
+        return atsumeruService.getBooksByBoundService(boundServiceName, boundServiceId)
     }
 
     @JvmStatic
     fun checkLinksDownloaded(links: List<String>): Single<DownloadedLinks> {
-        return com.atsumeru.api.AtsumeruAPI.atsumeruService.checkLinksDownloaded(HashMap<String, String>().apply {
+        return atsumeruService.checkLinksDownloaded(HashMap<String, String>().apply {
             put(
                 "links",
                 links.joinToString(",")
@@ -162,7 +162,7 @@ object AtsumeruAPI {
         category: String?,
         libraryPresentation: LibraryPresentation
     ): Single<List<Filters>> {
-        return com.atsumeru.api.AtsumeruAPI.atsumeruService.getFiltersList(contentType, category, libraryPresentation)
+        return atsumeruService.getFiltersList(contentType, category, libraryPresentation)
     }
 
     @JvmStatic
@@ -178,7 +178,7 @@ object AtsumeruAPI {
         limit: Int,
         withVolumesAndHistory: Boolean
     ): Single<List<Serie>> {
-        return com.atsumeru.api.AtsumeruAPI.atsumeruService.getFilteredList(
+        return atsumeruService.getFilteredList(
             contentType,
             category,
             libraryPresentation,
@@ -206,7 +206,7 @@ object AtsumeruAPI {
         magazines: List<String>?, magazinesMode: String?, years: String?,
         page: Int, limit: Int, withVolumesAndHistory: Boolean
     ): Single<List<Serie>> {
-        return com.atsumeru.api.AtsumeruAPI.atsumeruService.getFilteredList(
+        return atsumeruService.getFilteredList(
             contentType,
             libraryPresentation,
             search,
@@ -255,12 +255,12 @@ object AtsumeruAPI {
     //*****************************//
     @JvmStatic
     fun getMetacategoriesList(): Single<List<Metacategory>> {
-        return com.atsumeru.api.AtsumeruAPI.atsumeruService.getMetacategoriesList()
+        return atsumeruService.getMetacategoriesList()
     }
 
     @JvmStatic
     fun getMetacategoryEntries(metacategoryId: String): Single<List<Metacategory>> {
-        return com.atsumeru.api.AtsumeruAPI.atsumeruService.getMetacategoryEntries(metacategoryId)
+        return atsumeruService.getMetacategoryEntries(metacategoryId)
     }
 
     @JvmStatic
@@ -271,7 +271,7 @@ object AtsumeruAPI {
         limit: Int,
         withVolumesAndHistory: Boolean
     ): Single<List<Serie>> {
-        return com.atsumeru.api.AtsumeruAPI.atsumeruService.getMetacategoryEntryBooks(
+        return atsumeruService.getMetacategoryEntryBooks(
             metacategoryId,
             metacategoryEntryId,
             page,
@@ -285,32 +285,32 @@ object AtsumeruAPI {
     //*****************************//
     @JvmStatic
     fun getCategoriesList(): Single<List<Category>> {
-        return com.atsumeru.api.AtsumeruAPI.atsumeruService.getCategoriesList()
+        return atsumeruService.getCategoriesList()
     }
 
     @JvmStatic
     fun setCategories(contentIdsWithCategories: Map<String, String>): Single<AtsumeruMessage> {
-        return com.atsumeru.api.AtsumeruAPI.atsumeruService.setCategories(contentIdsWithCategories)
+        return atsumeruService.setCategories(contentIdsWithCategories)
     }
 
     @JvmStatic
     fun orderCategories(changedCategories: List<Category>): Single<AtsumeruMessage> {
-        return com.atsumeru.api.AtsumeruAPI.atsumeruService.orderCategories(changedCategories)
+        return atsumeruService.orderCategories(changedCategories)
     }
 
     @JvmStatic
     fun createCategory(categoryName: String): Single<AtsumeruMessage> {
-        return com.atsumeru.api.AtsumeruAPI.atsumeruService.createCategory(categoryName)
+        return atsumeruService.createCategory(categoryName)
     }
 
     @JvmStatic
     fun editCategory(categoryId: String, categoryName: String): Single<AtsumeruMessage> {
-        return com.atsumeru.api.AtsumeruAPI.atsumeruService.editCategory(categoryId, categoryName)
+        return atsumeruService.editCategory(categoryId, categoryName)
     }
 
     @JvmStatic
     fun deleteCategory(categoryId: String): Single<AtsumeruMessage> {
-        return com.atsumeru.api.AtsumeruAPI.atsumeruService.deleteCategory(categoryId)
+        return atsumeruService.deleteCategory(categoryId)
     }
 
     //*****************************//
@@ -323,7 +323,7 @@ object AtsumeruAPI {
         page: Int = 1,
         limit: Int = 50
     ): Single<List<Serie>> {
-        return com.atsumeru.api.AtsumeruAPI.atsumeruService.getBooksNewArrivals(libraryPresentation, ascendingOrder, page, limit)
+        return atsumeruService.getBooksNewArrivals(libraryPresentation, ascendingOrder, page, limit)
     }
 
     @JvmStatic
@@ -333,7 +333,7 @@ object AtsumeruAPI {
         page: Int = 1,
         limit: Int = 50
     ): Single<List<Serie>> {
-        return com.atsumeru.api.AtsumeruAPI.atsumeruService.getBooksLatestUpdates(libraryPresentation, ascendingOrder, page, limit)
+        return atsumeruService.getBooksLatestUpdates(libraryPresentation, ascendingOrder, page, limit)
     }
 
     //*****************************//
@@ -345,7 +345,7 @@ object AtsumeruAPI {
         page: Int = 1,
         limit: Int = 50
     ): Single<List<Serie>> {
-        return com.atsumeru.api.AtsumeruAPI.atsumeruService.getBooksHistory(libraryPresentation, page, limit)
+        return atsumeruService.getBooksHistory(libraryPresentation, page, limit)
     }
 
     //*****************************//
@@ -353,12 +353,12 @@ object AtsumeruAPI {
     //*****************************//
     @JvmStatic
     fun getBookDetails(bookHash: String): Single<Serie> {
-        return com.atsumeru.api.AtsumeruAPI.atsumeruService.getBookDetails(bookHash)
+        return atsumeruService.getBookDetails(bookHash)
     }
 
     @JvmStatic
     fun deleteBook(bookHash: String): Single<AtsumeruMessage> {
-        return com.atsumeru.api.AtsumeruAPI.atsumeruService.deleteBook(bookHash)
+        return atsumeruService.deleteBook(bookHash)
     }
 
     //*****************************//
@@ -366,12 +366,12 @@ object AtsumeruAPI {
     //*****************************//
     @JvmStatic
     fun getBookVolumes(bookHash: String): Single<List<Volume>> {
-        return com.atsumeru.api.AtsumeruAPI.atsumeruService.getBookVolumes(bookHash)
+        return atsumeruService.getBookVolumes(bookHash)
     }
 
     @JvmStatic
     fun getBookVolume(archiveHash: String): Single<Volume> {
-        return com.atsumeru.api.AtsumeruAPI.atsumeruService.getBookVolume(archiveHash)
+        return atsumeruService.getBookVolume(archiveHash)
     }
 
     //*****************************//
@@ -379,17 +379,17 @@ object AtsumeruAPI {
     //*****************************//
     @JvmStatic
     fun getBookChapters(bookHash: String): Single<List<Chapter>> {
-        return com.atsumeru.api.AtsumeruAPI.atsumeruService.getBookChapters(bookHash)
+        return atsumeruService.getBookChapters(bookHash)
     }
 
     @JvmStatic
     fun getVolumeChapters(archiveHash: String): Single<List<Chapter>> {
-        return com.atsumeru.api.AtsumeruAPI.atsumeruService.getVolumeChapters(archiveHash)
+        return atsumeruService.getVolumeChapters(archiveHash)
     }
 
     @JvmStatic
     fun getBookChapter(chapterHash: String): Single<Chapter> {
-        return com.atsumeru.api.AtsumeruAPI.atsumeruService.getBookChapter(chapterHash)
+        return atsumeruService.getBookChapter(chapterHash)
     }
 
     //*****************************//
@@ -397,7 +397,7 @@ object AtsumeruAPI {
     //*****************************//
     @JvmStatic
     fun getDirectoryListing(requestPath: String?): Single<DirectoryListing> {
-        return com.atsumeru.api.AtsumeruAPI.atsumeruService.getDirectoryListing(DirectoryRequest(requestPath))
+        return atsumeruService.getDirectoryListing(DirectoryRequest(requestPath))
     }
 
     //*****************************//
@@ -405,27 +405,27 @@ object AtsumeruAPI {
     //*****************************//
     @JvmStatic
     fun getUserList(): Single<List<User>> {
-        return com.atsumeru.api.AtsumeruAPI.atsumeruService.getUserList()
+        return atsumeruService.getUserList()
     }
 
     @JvmStatic
     fun getUserAccessConstants(): Single<UserAccessConstants> {
-        return com.atsumeru.api.AtsumeruAPI.atsumeruService.getUserAccessConstants()
+        return atsumeruService.getUserAccessConstants()
     }
 
     @JvmStatic
     fun createUser(user: User): Single<AtsumeruMessage> {
-        return com.atsumeru.api.AtsumeruAPI.atsumeruService.createUser(user)
+        return atsumeruService.createUser(user)
     }
 
     @JvmStatic
     fun updateUser(user: User): Single<AtsumeruMessage> {
-        return com.atsumeru.api.AtsumeruAPI.atsumeruService.updateUser(user)
+        return atsumeruService.updateUser(user)
     }
 
     @JvmStatic
     fun deleteUser(userId: Long): Single<AtsumeruMessage> {
-        return com.atsumeru.api.AtsumeruAPI.atsumeruService.deleteUser(userId)
+        return atsumeruService.deleteUser(userId)
     }
 
     //*****************************//
@@ -433,7 +433,7 @@ object AtsumeruAPI {
     //*****************************//
     @JvmStatic
     fun getServicesStatus(): Single<ServicesStatus> {
-        return com.atsumeru.api.AtsumeruAPI.atsumeruService.getServicesStatus()
+        return atsumeruService.getServicesStatus()
     }
 
     //*****************************//
@@ -441,7 +441,7 @@ object AtsumeruAPI {
     //*****************************//
     @JvmStatic
     fun getMetadataUpdateStatus(): Single<MetadataUpdateStatus> {
-        return com.atsumeru.api.AtsumeruAPI.atsumeruService.getMetadataUpdateStatus()
+        return atsumeruService.getMetadataUpdateStatus()
     }
 
     @JvmStatic
@@ -451,7 +451,7 @@ object AtsumeruAPI {
         saveIntoArchives: Boolean = false,
         saveIntoDBOnly: Boolean = false
     ): Single<AtsumeruMessage> {
-        return com.atsumeru.api.AtsumeruAPI.atsumeruService.updateMetadata(serie, serieOnly, saveIntoArchives, saveIntoDBOnly)
+        return atsumeruService.updateMetadata(serie, serieOnly, saveIntoArchives, saveIntoDBOnly)
     }
 
     @JvmStatic
@@ -460,12 +460,12 @@ object AtsumeruAPI {
         saveIntoDBOnly: Boolean = false,
         force: Boolean = false
     ): Single<AtsumeruMessage> {
-        return com.atsumeru.api.AtsumeruAPI.atsumeruService.createUniqueIds(saveIntoArchives, saveIntoDBOnly, force)
+        return atsumeruService.createUniqueIds(saveIntoArchives, saveIntoDBOnly, force)
     }
 
     @JvmStatic
     fun injectAllFromDatabase(): Single<AtsumeruMessage> {
-        return com.atsumeru.api.AtsumeruAPI.atsumeruService.injectAllFromDatabase()
+        return atsumeruService.injectAllFromDatabase()
     }
 
     //*****************************//
@@ -473,37 +473,37 @@ object AtsumeruAPI {
     //*****************************//
     @JvmStatic
     fun getImporterStatus(): Single<ImportStatus> {
-        return com.atsumeru.api.AtsumeruAPI.atsumeruService.getImporterStatus()
+        return atsumeruService.getImporterStatus()
     }
 
     @JvmStatic
     fun getImporterFoldersList(): Single<List<FolderProperty>> {
-        return com.atsumeru.api.AtsumeruAPI.atsumeruService.getImporterFoldersList()
+        return atsumeruService.getImporterFoldersList()
     }
 
     @JvmStatic
     fun addImporterFolder(folderProperty: FolderProperty): Single<AtsumeruMessage> {
-        return com.atsumeru.api.AtsumeruAPI.atsumeruService.addImporterFolder(folderProperty)
+        return atsumeruService.addImporterFolder(folderProperty)
     }
 
     @JvmStatic
     fun removeImporterFolder(folderHash: String): Single<AtsumeruMessage> {
-        return com.atsumeru.api.AtsumeruAPI.atsumeruService.removeImporterFolder(folderHash)
+        return atsumeruService.removeImporterFolder(folderHash)
     }
 
     @JvmStatic
     fun importerScan(): Single<AtsumeruMessage> {
-        return com.atsumeru.api.AtsumeruAPI.atsumeruService.importerScan()
+        return atsumeruService.importerScan()
     }
 
     @JvmStatic
     fun importerRescan(updateCovers: Boolean): Single<AtsumeruMessage> {
-        return com.atsumeru.api.AtsumeruAPI.atsumeruService.importerRescan(updateCovers)
+        return atsumeruService.importerRescan(updateCovers)
     }
 
     @JvmStatic
     fun importerRescan(folderHash: String, fullRescan: Boolean, updateCovers: Boolean): Single<AtsumeruMessage> {
-        return com.atsumeru.api.AtsumeruAPI.atsumeruService.importerRescan(folderHash, fullRescan, updateCovers)
+        return atsumeruService.importerRescan(folderHash, fullRescan, updateCovers)
     }
 
     //*****************************//
@@ -511,12 +511,12 @@ object AtsumeruAPI {
     ///****************************//
     @JvmStatic
     fun getServerSettings(): Single<ServerSettings> {
-        return com.atsumeru.api.AtsumeruAPI.atsumeruService.getServerSettings()
+        return atsumeruService.getServerSettings()
     }
 
     @JvmStatic
     fun updateServerSettings(serverSettings: ServerSettings): Single<AtsumeruMessage> {
-        return com.atsumeru.api.AtsumeruAPI.atsumeruService.updateServerSettings(serverSettings)
+        return atsumeruService.updateServerSettings(serverSettings)
     }
 
     //*****************************//
@@ -524,17 +524,17 @@ object AtsumeruAPI {
     ///****************************//
     @JvmStatic
     fun getUpdateReadHistory(archiveHash: String, chapterHash: String? = null, page: Int = 1): Single<AtsumeruMessage> {
-        return com.atsumeru.api.AtsumeruAPI.atsumeruService.getUpdateReadHistory(archiveHash, chapterHash, page)
+        return atsumeruService.getUpdateReadHistory(archiveHash, chapterHash, page)
     }
 
     @JvmStatic
     fun postUpdateReadHistory(values: Map<String, String>): Single<AtsumeruMessage> {
-        return com.atsumeru.api.AtsumeruAPI.atsumeruService.postUpdateReadHistory(values)
+        return atsumeruService.postUpdateReadHistory(values)
     }
 
     @JvmStatic
     fun pullBookHistory(bookOrArchiveHash: String): Single<List<History>> {
-        return com.atsumeru.api.AtsumeruAPI.atsumeruService.pullBookHistory(bookOrArchiveHash)
+        return atsumeruService.pullBookHistory(bookOrArchiveHash)
     }
 
     //*****************************//
@@ -569,8 +569,8 @@ object AtsumeruAPI {
             .build()
 
         return Single.create { subscriber: SingleEmitter<AtsumeruMessage> ->
-            val response = com.atsumeru.api.AtsumeruAPI.httpClient.newCall(request).execute()
-            val message = com.atsumeru.api.AtsumeruAPI.gson.fromJson(response.body()?.string(), AtsumeruMessage::class.java)
+            val response = httpClient.newCall(request).execute()
+            val message = gson.fromJson(response.body()?.string(), AtsumeruMessage::class.java)
             subscriber.onSuccess(message)
         }
     }
