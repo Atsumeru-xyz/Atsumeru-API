@@ -23,6 +23,9 @@ class FolderProperty : Serializable {
     @SerializedName("singles_if_in_root_with_folders")
     var isSinglesIfInRootWithFolders = false
 
+    @SerializedName("ignore_volume_numbers_detection")
+    var isIgnoreVolumeNumbersDetection = false
+
     @SerializedName("series_count")
     var seriesCount: Long = -1
 
