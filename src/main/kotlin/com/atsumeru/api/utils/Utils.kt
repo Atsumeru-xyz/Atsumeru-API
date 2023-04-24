@@ -31,7 +31,7 @@ enum class ServiceType(private val formatUrl: String, private val idPattern: Pat
         Pattern.compile("manga/(\\d+)")
     ),
     SHIKIMORI(
-        "https://shikimori.one/mangas/%s",
+        "https://shikimori.me/mangas/%s",
         Pattern.compile("/(\\d+)|/\\w(\\d+)")
     ),
     KITSU(
