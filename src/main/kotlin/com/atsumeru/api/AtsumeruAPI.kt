@@ -195,15 +195,15 @@ object AtsumeruAPI {
     @JvmStatic
     fun getFilteredList(
         contentType: String?, libraryPresentation: LibraryPresentation, search: String?, sort: Sort?,
-        ascending: Boolean?, status: String?, translationStatus: String?,
+        ascending: Boolean?, status: String?, translationStatus: String?, plotType: String?,
         censorship: String?, color: String?, ageRating: String?,
         authors: List<String>?, authorsMode: String?, artists: List<String>?, artistsMode: String?,
         publishers: List<String>?, publishersMode: String?, translators: List<String>?, translatorsMode: String?,
         genres: List<String>?, genresMode: String?, tags: List<String>?, tagsMode: String?,
         countries: List<String>?, countriesMode: String?, languages: List<String>?, languagesMode: String?,
         events: List<String>?, eventsMode: String?, characters: List<String>?, charactersMode: String?,
-        parodies: List<String>?, parodiesMode: String?, circles: List<String>?, circlesMode: String?,
-        magazines: List<String>?, magazinesMode: String?, years: String?,
+        series: List<String>?, seriesMode: String?, parodies: List<String>?, parodiesMode: String?,
+        circles: List<String>?, circlesMode: String?, magazines: List<String>?, magazinesMode: String?, years: String?,
         page: Int, limit: Int, withVolumesAndHistory: Boolean
     ): Single<List<Serie>> {
         return atsumeruService.getFilteredList(
@@ -214,6 +214,7 @@ object AtsumeruAPI {
             ascending,
             status,
             translationStatus,
+            plotType,
             censorship,
             color,
             ageRating,
@@ -237,6 +238,8 @@ object AtsumeruAPI {
             eventsMode,
             characters,
             charactersMode,
+            series,
+            seriesMode,
             parodies,
             parodiesMode,
             circles,

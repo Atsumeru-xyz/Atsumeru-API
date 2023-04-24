@@ -103,8 +103,15 @@ open class Serie : Serializable {
     var translationStatus: String? = null
         get() = itemOrEmpty(field)
 
+    @SerializedName("plot_type")
+    var plotType: String? = null
+        get() = itemOrEmpty(field)
+
     var censorship: String? = null
         get() = itemOrEmpty(field)
+
+    var series: List<String>? = null
+        get() = if (field == null) ArrayList() else field
 
     var parodies: List<String>? = null
         get() = if (field == null) ArrayList() else field
