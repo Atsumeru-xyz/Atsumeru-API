@@ -190,6 +190,9 @@ interface AtsumeruService {
     @GET("/api/v1/books/{book_hash}")
     fun getBookDetails(@Path("book_hash") bookHash: String): Single<Serie>
 
+    @GET("/api/v1/books/{serie_hash}/serie")
+    fun getBookSeries(@Path("serie_hash") serieHash: String): Single<List<Serie>>
+
     @DELETE("/api/v1/books/delete/{book_hash}")
     fun deleteBook(@Path("book_hash") bookHash: String): Single<AtsumeruMessage>
 

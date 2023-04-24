@@ -360,6 +360,11 @@ object AtsumeruAPI {
     }
 
     @JvmStatic
+    fun getBookSeries(serieHash: String): Single<List<Serie>> {
+        return atsumeruService.getBookSeries(serieHash)
+    }
+
+    @JvmStatic
     fun deleteBook(bookHash: String): Single<AtsumeruMessage> {
         return atsumeruService.deleteBook(bookHash)
     }
