@@ -43,8 +43,8 @@ enum class ServiceType(private val formatUrl: String, private val idPattern: Pat
         Pattern.compile("manga/(\\d+)")
     ),
     MANGAUPDATES(
-        "https://www.mangaupdates.com/series.html?id=%s",
-        Pattern.compile("\\?id=(\\d+)")
+        "https://www.mangaupdates.com/series/%s",
+        Pattern.compile("series/(.*?)/|series/(.*?)\$")
     ),
     ANIMEPLANET(
         "https://www.anime-planet.com/manga/%s",
