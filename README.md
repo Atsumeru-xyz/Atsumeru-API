@@ -33,8 +33,7 @@ serverManager.addServer(
         serverManager.createNewServerId(),
         <server name>,
         <server address>,
-        Pair(<username>, <password>),
-        isEncrypted // if connecting with ConnectKey
+        Pair(<username>, <password>)
     )
 )
 ```
