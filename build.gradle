@@ -1,39 +1,35 @@
 plugins {
-    id 'org.jetbrains.kotlin.jvm' version '1.3.41'
+    id 'org.jetbrains.kotlin.jvm' version '2.3.0'
 }
 
-group 'com.atsumeru.api'
-version '1.2'
+group 'xyz.atsumeru.api'
+version '2.0'
 
 repositories {
     mavenCentral()
 }
 
-compileKotlin {
-    kotlinOptions.jvmTarget = "1.8"
-}
-compileTestKotlin {
-    kotlinOptions.jvmTarget = "1.8"
-}
-
 dependencies {
-    compile "org.jetbrains.kotlin:kotlin-stdlib-jdk8"
+    // RxJava 2
+    implementation 'io.reactivex.rxjava2:rxjava:2.2.21'
 
-    // RxAndroid2
-    implementation 'io.reactivex.rxjava2:rxandroid:2.1.0'
+    // Okhttp 3
+    implementation 'com.squareup.okhttp3:okhttp:5.3.2'
+    implementation 'com.squareup.okhttp3:logging-interceptor:5.3.2'
 
-    implementation 'com.squareup.okhttp3:okhttp:3.9.0'
-    implementation 'com.squareup.okhttp3:logging-interceptor:3.9.0'
-    implementation 'com.squareup.retrofit2:retrofit:2.3.0'
-    implementation 'com.squareup.retrofit2:converter-gson:2.3.0'
-    implementation "com.squareup.retrofit2:adapter-rxjava2:2.3.0"
-    implementation 'com.google.code.gson:gson:2.8.5'
+    // Retrofit 2
+    implementation 'com.squareup.retrofit2:retrofit:3.0.0'
+    implementation 'com.squareup.retrofit2:converter-gson:3.0.0'
+    implementation "com.squareup.retrofit2:adapter-rxjava2:3.0.0"
+
+    // Gson
+    implementation 'com.google.code.gson:gson:2.13.2'
 }
 
 jar {
     manifest {
         attributes 'Implementation-Title': 'Atsumeru API Library',
                 'Implementation-Version': version,
-                'Built-By': 'AtsumeruDev'
+                'Built-By': 'Atsumeru.xyz'
     }
 }
